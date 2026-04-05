@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "swarmies",
+  "project_id": "263e2ef4-51dd-4b97-a29d-5db207e0e70a"
+}
