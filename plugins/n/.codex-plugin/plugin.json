@@ -1,7 +1,7 @@
 {
   "name": "n",
   "version": "0.1.0",
-  "description": "Start a Beads work session quickly in the Swarmies repo.",
+  "description": "Start a Beads work session with a fixed, minimal flow.",
   "author": {
     "name": "Nik Stern",
     "email": "nik.sam.stern@gmail.com",
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "N",
-    "shortDescription": "Kick off the next Beads task quickly",
-    "longDescription": "Use N to start a Swarmies work session: inspect the ready queue, pick the next claimable issue, and continue with the repo's Beads-first workflow.",
+    "shortDescription": "Run a fixed Beads startup flow",
+    "longDescription": "Use N to start a Swarmies work session with minimal ambiguity: inspect the ready queue, take the first ready issue, summarize it, and claim it only on confirmation.",
     "developerName": "Nik Stern",
     "category": "Productivity",
     "capabilities": [
@@ -29,9 +29,9 @@
     "privacyPolicyURL": "https://github.com/nikstern/swarmies",
     "termsOfServiceURL": "https://github.com/nikstern/swarmies",
     "defaultPrompt": [
-      "Start a Beads session and claim the best next task in this repo",
-      "Show the ready queue, summarize the top options, and claim one",
-      "Run the Swarmies startup routine for the next Beads task"
+      "Run the fixed N startup flow for the next Beads task",
+      "Use bd ready, inspect the first issue, and ask whether to claim it",
+      "Start a deterministic Beads session in this repo"
     ],
     "brandColor": "#0F766E",
     "screenshots": []
