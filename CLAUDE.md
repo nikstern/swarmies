@@ -1,23 +1,6 @@
-# Swarmies
+# Project Instructions for AI Agents
 
-An agent orchestration framework using:
-
-- Go
-- [Beads for task management](./docs/architecture/beads.md)
-- [Planned tech-stack](./docs/tech-stack.md)
-
-Current Plan:
-
-- [v1](./docs/roadmap/v1/v1.md)
-
-## Task management overview
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-```
+This file provides instructions and context for AI coding agents working on this project.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
@@ -65,3 +48,22 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+
+## Build & Test
+
+_Add your build and test commands here_
+
+```bash
+# Example:
+# npm install
+# npm test
+```
+
+## Architecture Overview
+
+_Add a brief overview of your project architecture_
+
+## Conventions & Patterns
+
+_Add your project-specific conventions here_
