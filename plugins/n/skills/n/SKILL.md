@@ -1,6 +1,6 @@
 ---
 name: n
-description: Start a Swarmies Beads session with a fixed flow: list ready work, inspect the first ready issue, and claim it on confirmation.
+description: Start a Swarmies Beads session via a deterministic script that previews the first ready issue and claims it on confirmation.
 ---
 
 # N
@@ -10,26 +10,23 @@ bootstrap in the Swarmies repo.
 
 ## Contract
 
-- Run a fixed startup sequence.
-- Do not invent ranking logic beyond Beads ordering.
-- Treat the first issue returned by `bd ready` as the next issue.
+- Use `python3 plugins/n/scripts/start_session.py` as the source of truth.
+- Do not reimplement task selection logic in the model.
 - Claim only after the user explicitly says to proceed.
-- If `bd ready` returns nothing, stop and report that no work is ready.
+- If the script reports no ready work, stop there.
 
 ## Fixed flow
 
 1. Run `bd prime` if session context needs refreshing.
-2. Run `bd ready` to list claimable work.
-3. Select the first issue in the `bd ready` output.
-4. Run `bd show <id>` for that issue only.
-5. Summarize the issue briefly and ask whether to claim it.
-6. If the user says yes, run `bd update <id> --claim`.
+2. Run `python3 plugins/n/scripts/start_session.py`.
+3. Present the script output briefly.
+4. If the user says yes, run `python3 plugins/n/scripts/start_session.py --claim <id>`.
 
 ## Output format
 
 - Show the chosen issue ID and title.
-- State that it was selected because it was first in `bd ready`.
-- Keep the summary short: why, what, blockers or dependencies, and next action.
+- State that it was selected by the script from the first `bd ready` result.
+- Keep the summary short and follow the script output.
 
 ## Repo conventions
 

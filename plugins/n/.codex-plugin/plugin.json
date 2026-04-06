@@ -1,7 +1,7 @@
 {
   "name": "n",
   "version": "0.1.0",
-  "description": "Start a Beads work session with a fixed, minimal flow.",
+  "description": "Start a Beads work session with a script-backed deterministic flow.",
   "author": {
     "name": "Nik Stern",
     "email": "nik.sam.stern@gmail.com",
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "N",
-    "shortDescription": "Run a fixed Beads startup flow",
-    "longDescription": "Use N to start a Swarmies work session with minimal ambiguity: inspect the ready queue, take the first ready issue, summarize it, and claim it only on confirmation.",
+    "shortDescription": "Run a script-backed Beads startup flow",
+    "longDescription": "Use N to start a Swarmies work session through one deterministic script: preview the first ready issue, summarize it, and claim that exact issue only on confirmation.",
     "developerName": "Nik Stern",
     "category": "Productivity",
     "capabilities": [
@@ -29,9 +29,9 @@
     "privacyPolicyURL": "https://github.com/nikstern/swarmies",
     "termsOfServiceURL": "https://github.com/nikstern/swarmies",
     "defaultPrompt": [
-      "Run the fixed N startup flow for the next Beads task",
-      "Use bd ready, inspect the first issue, and ask whether to claim it",
-      "Start a deterministic Beads session in this repo"
+      "Run the N startup script for the next Beads task",
+      "Preview the first ready issue and ask whether to claim it",
+      "Start a script-backed deterministic Beads session"
     ],
     "brandColor": "#0F766E",
     "screenshots": []
