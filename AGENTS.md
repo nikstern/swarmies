@@ -10,6 +10,11 @@ Current Plan:
 
 - [v1](./docs/roadmap/v1/v1.md)
 
+## Go commands
+
+Use `make test` for tests and `make build` for builds. These targets set
+repo-local Go cache paths so commands work reliably in sandboxed environments.
+
 ## Task management overview
 
 ```bash
