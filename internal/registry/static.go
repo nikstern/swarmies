@@ -21,35 +21,22 @@ func NewStatic(profiles ...swarmies.AgentProfile) *StaticRegistry {
 func DefaultProfiles() []swarmies.AgentProfile {
 	return []swarmies.AgentProfile{
 		{
-			ID:                 swarmies.ProfileGeneralist,
-			Name:               "Generalist",
-			Description:        "Default profile for uncategorized work",
-			AgentCardURL:       "http://127.0.0.1:8080/.well-known/agent-card.json",
-			PreferredTransport: "a2a-http",
-			Skills: []swarmies.AgentSkill{
-				{
-					ID:          "beads-claim-and-report",
-					Name:        "Claim Beads work",
-					Description: "Claims a Beads issue and returns a structured execution result",
-					Tags:        []string{"beads", "dispatch", "generalist"},
-					InputModes:  []string{"text/plain"},
-					OutputModes: []string{"application/json", "text/plain"},
-				},
-			},
+			ID:           swarmies.ProfileGeneralist,
+			Name:         "Generalist",
+			Description:  "Default profile for uncategorized work",
+			AgentCardURL: "http://127.0.0.1:8080",
 		},
 		{
-			ID:                 swarmies.ProfileResearch,
-			Name:               "Research",
-			Description:        "Profile for analysis and information gathering",
-			AgentCardURL:       "http://127.0.0.1:8081/.well-known/agent-card.json",
-			PreferredTransport: "a2a-http",
+			ID:           swarmies.ProfileResearch,
+			Name:         "Research",
+			Description:  "Profile for analysis and information gathering",
+			AgentCardURL: "http://127.0.0.1:8081",
 		},
 		{
-			ID:                 swarmies.ProfileCoding,
-			Name:               "Coding",
-			Description:        "Profile for implementation-oriented work",
-			AgentCardURL:       "http://127.0.0.1:8082/.well-known/agent-card.json",
-			PreferredTransport: "a2a-http",
+			ID:           swarmies.ProfileCoding,
+			Name:         "Coding",
+			Description:  "Profile for implementation-oriented work",
+			AgentCardURL: "http://127.0.0.1:8082",
 		},
 	}
 }

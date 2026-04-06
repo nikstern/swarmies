@@ -30,21 +30,34 @@ type Runtime struct {
 }
 
 type agentWorkRequest struct {
-	TaskID    string            `json:"task_id"`
-	ContextID string            `json:"context_id"`
-	Profile   string            `json:"profile"`
-	WorkItem  swarmies.WorkItem `json:"work_item"`
+	TaskID         string            `json:"task_id"`
+	ContextID      string            `json:"context_id"`
+	Profile        string            `json:"profile"`
+	IdempotencyKey string            `json:"idempotency_key,omitempty"`
+	WorkItem       swarmies.WorkItem `json:"work_item"`
 }
 
 type agentWorkResult struct {
-	TaskID       string                  `json:"task_id"`
-	ContextID    string                  `json:"context_id"`
-	State        swarmies.ExecutionState `json:"state"`
-	Summary      string                  `json:"summary"`
-	Artifacts    []swarmies.ArtifactRef  `json:"artifacts,omitempty"`
-	ErrorCode    string                  `json:"error_code,omitempty"`
-	ErrorMessage string                  `json:"error_message,omitempty"`
+	TaskID       string             `json:"task_id"`
+	ContextID    string             `json:"context_id"`
+	State        executionState     `json:"state"`
+	Summary      string             `json:"summary"`
+	Artifacts    []runtimeArtifact  `json:"artifacts,omitempty"`
+	ErrorCode    string             `json:"error_code,omitempty"`
+	ErrorMessage string             `json:"error_message,omitempty"`
 }
+
+type runtimeArtifact struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type executionState string
+
+const (
+	stateSucceeded executionState = "succeeded"
+)
 
 func NewRuntime(name string, beads beadsClaimer) (*Runtime, error) {
 	if name == "" {
@@ -96,9 +109,9 @@ func (r *Runtime) SessionService() session.Service {
 	return r.sessionService
 }
 
-func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Content) (swarmies.DispatchResult, error) {
+func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Content) (agentWorkResult, error) {
 	if r == nil || r.runner == nil {
-		return swarmies.DispatchResult{}, fmt.Errorf("a2a: runtime runner is not configured")
+		return agentWorkResult{}, fmt.Errorf("a2a: runtime runner is not configured")
 	}
 
 	if contextID == "" {
@@ -108,7 +121,7 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	var final string
 	for event, err := range r.runner.Run(ctx, "dispatcher", contextID, content, agent.RunConfig{}) {
 		if err != nil {
-			return swarmies.DispatchResult{}, fmt.Errorf("a2a: run agent: %w", err)
+			return agentWorkResult{}, fmt.Errorf("a2a: run agent: %w", err)
 		}
 		if event == nil || event.Content == nil {
 			continue
@@ -119,23 +132,15 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	}
 
 	if final == "" {
-		return swarmies.DispatchResult{}, fmt.Errorf("a2a: agent returned no final content")
+		return agentWorkResult{}, fmt.Errorf("a2a: agent returned no final content")
 	}
 
 	var result agentWorkResult
 	if err := json.Unmarshal([]byte(final), &result); err != nil {
-		return swarmies.DispatchResult{}, fmt.Errorf("a2a: decode agent result: %w", err)
+		return agentWorkResult{}, fmt.Errorf("a2a: decode agent result: %w", err)
 	}
 
-	return swarmies.DispatchResult{
-		TaskID:       result.TaskID,
-		ContextID:    result.ContextID,
-		State:        result.State,
-		Summary:      result.Summary,
-		Artifacts:    result.Artifacts,
-		ErrorCode:    result.ErrorCode,
-		ErrorMessage: result.ErrorMessage,
-	}, nil
+	return result, nil
 }
 
 func newGeneralistAgent(beads beadsClaimer) (agent.Agent, error) {
@@ -158,9 +163,9 @@ func newGeneralistAgent(beads beadsClaimer) (agent.Agent, error) {
 				result := agentWorkResult{
 					TaskID:    req.TaskID,
 					ContextID: req.ContextID,
-					State:     swarmies.StateSucceeded,
+					State:     stateSucceeded,
 					Summary:   fmt.Sprintf("Generalist agent claimed %s and produced a structured result", req.TaskID),
-					Artifacts: []swarmies.ArtifactRef{
+					Artifacts: []runtimeArtifact{
 						{
 							ID:          "claim-receipt",
 							Name:        "beads-claim",

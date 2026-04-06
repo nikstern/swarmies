@@ -3,6 +3,8 @@ package swarmies
 import (
 	"context"
 	"time"
+
+	a2acore "github.com/a2aproject/a2a-go/a2a"
 )
 
 type BeadsClient interface {
@@ -23,11 +25,11 @@ type AgentRegistry interface {
 }
 
 type A2AGateway interface {
-	Dispatch(ctx context.Context, req DispatchRequest) (DispatchResult, error)
+	SendMessage(ctx context.Context, profile AgentProfile, params *a2acore.MessageSendParams) (a2acore.SendMessageResult, error)
 }
 
 type ResultPolicy interface {
-	Decide(task WorkItem, result DispatchResult) OutcomeDecision
+	Decide(task WorkItem, result a2acore.SendMessageResult) OutcomeDecision
 }
 
 type BeadsTaskRef struct {
@@ -64,32 +66,10 @@ const (
 )
 
 type AgentProfile struct {
-	ID                 ProfileID
-	Name               string
-	Description        string
-	AgentCardURL       string
-	PreferredTransport string
-	Skills             []AgentSkill
-}
-
-type DispatchRequest struct {
-	WorkItem       WorkItem
-	Profile        AgentProfile
-	TaskID         string
-	ContextID      string
-	IdempotencyKey string
-}
-
-type DispatchResult struct {
-	TaskID       string
-	ContextID    string
-	State        ExecutionState
-	MessageID    string
-	Summary      string
-	Artifacts    []ArtifactRef
-	ErrorCode    string
-	ErrorMessage string
-	CompletedAt  *time.Time
+	ID           ProfileID
+	Name         string
+	Description  string
+	AgentCardURL string
 }
 
 type AgentSkill struct {
@@ -100,22 +80,6 @@ type AgentSkill struct {
 	InputModes  []string
 	OutputModes []string
 }
-
-type ArtifactRef struct {
-	ID          string
-	Name        string
-	Description string
-}
-
-type ExecutionState string
-
-const (
-	StateSubmitted     ExecutionState = "submitted"
-	StateWorking       ExecutionState = "working"
-	StateInputRequired ExecutionState = "input_required"
-	StateSucceeded     ExecutionState = "succeeded"
-	StateFailed        ExecutionState = "failed"
-)
 
 type OutcomeDecision string
 

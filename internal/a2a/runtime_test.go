@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nikstern/swarmies"
 	"google.golang.org/genai"
 )
 
@@ -40,43 +39,6 @@ func TestNewRuntimeConfiguresADKLoaderAndSessionService(t *testing.T) {
 	}
 	if runtime.Launcher() == nil {
 		t.Fatal("Launcher() = nil")
-	}
-}
-
-func TestGatewayDispatchClaimsTaskAndReturnsStructuredResult(t *testing.T) {
-	t.Parallel()
-
-	claims := &claimRecorder{}
-	runtime, err := NewRuntime("generalist", claims)
-	if err != nil {
-		t.Fatalf("NewRuntime() error = %v", err)
-	}
-
-	gateway := NewGateway(runtime)
-	result, err := gateway.Dispatch(context.Background(), swarmies.DispatchRequest{
-		TaskID:    "swarmies-0kq",
-		ContextID: "swarmies-0kq",
-		Profile:   swarmies.AgentProfile{ID: swarmies.ProfileGeneralist},
-		WorkItem: swarmies.WorkItem{
-			TaskID: "swarmies-0kq",
-			Title:  "Expose a minimal ADK-backed generalist agent over A2A",
-		},
-	})
-	if err != nil {
-		t.Fatalf("Dispatch() error = %v", err)
-	}
-
-	if len(claims.claimed) != 1 || claims.claimed[0] != "swarmies-0kq" {
-		t.Fatalf("claimed = %v, want [swarmies-0kq]", claims.claimed)
-	}
-	if result.TaskID != "swarmies-0kq" {
-		t.Fatalf("result.TaskID = %q, want %q", result.TaskID, "swarmies-0kq")
-	}
-	if result.State != swarmies.StateSucceeded {
-		t.Fatalf("result.State = %q, want %q", result.State, swarmies.StateSucceeded)
-	}
-	if result.Summary == "" {
-		t.Fatal("result.Summary = empty")
 	}
 }
 

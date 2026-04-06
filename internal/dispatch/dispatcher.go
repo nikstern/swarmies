@@ -61,22 +61,21 @@ func (d *Dispatcher) RunOnce(ctx context.Context) error {
 		return fmt.Errorf("select profile for %q: %w", workItem.TaskID, err)
 	}
 
-	result, err := d.gateway.Dispatch(ctx, swarmies.DispatchRequest{
-		WorkItem:       workItem,
-		Profile:        profile,
-		TaskID:         workItem.TaskID,
-		ContextID:      workItem.TaskID,
-		IdempotencyKey: workItem.TaskID,
-	})
+	params, err := BuildMessageParams(workItem, profile)
+	if err != nil {
+		return fmt.Errorf("build A2A request for %q: %w", workItem.TaskID, err)
+	}
+
+	result, err := d.gateway.SendMessage(ctx, profile, params)
 	if err != nil {
 		return fmt.Errorf("dispatch task %q: %w", workItem.TaskID, err)
 	}
 
 	switch d.policy.Decide(workItem, result) {
 	case swarmies.OutcomeClose:
-		return d.beads.Close(ctx, workItem.TaskID, result.Summary)
+		return d.beads.Close(ctx, workItem.TaskID, Summary(result))
 	case swarmies.OutcomeRetry:
-		return d.beads.Comment(ctx, workItem.TaskID, result.ErrorMessage)
+		return d.beads.Comment(ctx, workItem.TaskID, ErrorMessage(result))
 	default:
 		return nil
 	}
