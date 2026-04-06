@@ -1,0 +1,20 @@
+{
+  "name": "swarmies-local",
+  "interface": {
+    "displayName": "Swarmies Local"
+  },
+  "plugins": [
+    {
+      "name": "n",
+      "source": {
+        "source": "local",
+        "path": "./plugins/n"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

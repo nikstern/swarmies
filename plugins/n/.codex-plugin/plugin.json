@@ -1,0 +1,39 @@
+{
+  "name": "n",
+  "version": "0.1.0",
+  "description": "Start a Beads work session quickly in the Swarmies repo.",
+  "author": {
+    "name": "Nik Stern",
+    "email": "nik.sam.stern@gmail.com",
+    "url": "https://github.com/nikstern"
+  },
+  "homepage": "https://github.com/nikstern/swarmies",
+  "repository": "https://github.com/nikstern/swarmies",
+  "license": "MIT",
+  "keywords": [
+    "beads",
+    "workflow",
+    "session"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "N",
+    "shortDescription": "Kick off the next Beads task quickly",
+    "longDescription": "Use N to start a Swarmies work session: inspect the ready queue, pick the next claimable issue, and continue with the repo's Beads-first workflow.",
+    "developerName": "Nik Stern",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "websiteURL": "https://github.com/nikstern/swarmies",
+    "privacyPolicyURL": "https://github.com/nikstern/swarmies",
+    "termsOfServiceURL": "https://github.com/nikstern/swarmies",
+    "defaultPrompt": [
+      "Start a Beads session and claim the best next task in this repo",
+      "Show the ready queue, summarize the top options, and claim one",
+      "Run the Swarmies startup routine for the next Beads task"
+    ],
+    "brandColor": "#0F766E",
+    "screenshots": []
+  }
+}
