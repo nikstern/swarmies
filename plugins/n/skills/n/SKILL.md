@@ -1,6 +1,6 @@
 ---
 name: n
-description: Start a Swarmies Beads session via a deterministic script that previews the first ready issue and claims it on confirmation.
+description: Start a Swarmies Beads session via a deterministic script that claims the first ready issue and begins implementation automatically.
 ---
 
 # N
@@ -12,21 +12,20 @@ bootstrap in the Swarmies repo.
 
 - Use `python3 plugins/n/scripts/start_session.py` as the source of truth.
 - Do not reimplement task selection logic in the model.
-- Claim only after the user explicitly says to proceed.
+- Claim the selected issue immediately and continue into implementation unless the script reports no ready work.
 - If the script reports no ready work, stop there.
 
 ## Fixed flow
 
 1. Run `bd prime` if session context needs refreshing.
-2. Run `python3 plugins/n/scripts/start_session.py`.
-3. Present the script output briefly.
-4. If the user says yes, run `python3 plugins/n/scripts/start_session.py --claim <id>`.
+2. Run `python3 plugins/n/scripts/start_session.py --auto-claim`.
+3. Briefly report the claimed issue and begin implementation without waiting for another confirmation.
 
 ## Output format
 
 - Show the chosen issue ID and title.
 - State that it was selected by the script from the first `bd ready` result.
-- Keep the summary short and follow the script output.
+- Keep the summary short, note that the issue was auto-claimed, and proceed directly into implementation.
 
 ## Repo conventions
 
