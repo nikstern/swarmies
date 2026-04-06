@@ -30,6 +30,7 @@ go.work.sum
 # Local build caches
 .cache/
 .gocache/
+__pycache__/
 
 # Editor/IDE
 # .idea/
