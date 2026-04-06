@@ -1,0 +1,4 @@
+github.com/a2aproject/a2a-go v0.3.13 h1:WpIcSHgCySIxD7OQEdV7U7WJc/HL/G2QQj0RJ0YhPi0=
+github.com/a2aproject/a2a-go v0.3.13/go.mod h1:I7Cm+a1oL+UT6zMoP+roaRE5vdfUa1iQGVN8aSOuZ0I=
+google.golang.org/adk v1.0.0 h1:DcJGKH9YweOdsAvE5Hu9UhhLoVYcNEVKzvOPS+B49lQ=
+google.golang.org/adk v1.0.0/go.mod h1:wLmpRAp0zXcrdUN2V6mNoh+mj/4O16k0YzGJMNF7Mjk=
