@@ -2,37 +2,40 @@ package a2a
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/nikstern/swarmies"
+	"google.golang.org/genai"
 )
 
-type Gateway struct{}
-
-func NewGateway() *Gateway {
-	return &Gateway{}
+type Gateway struct {
+	runtime *Runtime
 }
 
-func (g *Gateway) Dispatch(context.Context, swarmies.DispatchRequest) (swarmies.DispatchResult, error) {
-	return swarmies.DispatchResult{
-		TaskID:  "",
-		State:   swarmies.StateSubmitted,
-		Summary: "A2A dispatch scaffold is not implemented yet",
-	}, nil
+func NewGateway(runtime *Runtime) *Gateway {
+	return &Gateway{runtime: runtime}
 }
 
-type Runtime struct {
-	Name string
-}
-
-func NewRuntime(name string) *Runtime {
-	if name == "" {
-		name = "generalist"
+func (g *Gateway) Dispatch(ctx context.Context, req swarmies.DispatchRequest) (swarmies.DispatchResult, error) {
+	if g == nil || g.runtime == nil {
+		return swarmies.DispatchResult{}, fmt.Errorf("a2a: runtime is not configured")
 	}
 
-	return &Runtime{Name: name}
-}
+	prompt, err := json.Marshal(agentWorkRequest{
+		TaskID:    req.TaskID,
+		ContextID: req.ContextID,
+		Profile:   string(req.Profile.ID),
+		WorkItem:  req.WorkItem,
+	})
+	if err != nil {
+		return swarmies.DispatchResult{}, fmt.Errorf("a2a: encode request: %w", err)
+	}
 
-func (r *Runtime) Description() string {
-	return fmt.Sprintf("ADK-backed runtime scaffold for profile %q", r.Name)
+	return g.runtime.Run(ctx, req.ContextID, &genai.Content{
+		Role: genai.RoleUser,
+		Parts: []*genai.Part{
+			{Text: string(prompt)},
+		},
+	})
 }

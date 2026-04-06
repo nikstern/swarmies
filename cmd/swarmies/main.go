@@ -15,9 +15,12 @@ func main() {
 
 	beadsClient := beads.NewClient(beads.DefaultBinary)
 	agentRegistry := registry.NewStatic(registry.DefaultProfiles()...)
-	gateway := a2a.NewGateway()
 	policy := dispatch.NewDefaultResultPolicy()
-	runtime := a2a.NewRuntime("generalist")
+	runtime, err := a2a.NewRuntime("generalist", beadsClient)
+	if err != nil {
+		log.Fatalf("configure ADK runtime: %v", err)
+	}
+	gateway := a2a.NewGateway(runtime)
 	dispatcher := dispatch.NewDispatcher(beadsClient, agentRegistry, gateway, policy)
 
 	if err := dispatcher.RunOnce(ctx); err != nil {
