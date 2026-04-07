@@ -42,28 +42,6 @@ type agentWorkRequest struct {
 	WorkItem       swarmies.WorkItem `json:"work_item"`
 }
 
-type agentWorkResult struct {
-	TaskID       string            `json:"task_id"`
-	ContextID    string            `json:"context_id"`
-	State        executionState    `json:"state"`
-	Summary      string            `json:"summary"`
-	Artifacts    []runtimeArtifact `json:"artifacts,omitempty"`
-	ErrorCode    string            `json:"error_code,omitempty"`
-	ErrorMessage string            `json:"error_message,omitempty"`
-}
-
-type runtimeArtifact struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-type executionState string
-
-const (
-	stateSucceeded executionState = "succeeded"
-)
-
 func NewRuntime(name string, beads beadsClaimer) (*Runtime, error) {
 	if name == "" {
 		name = string(swarmies.ProfileGeneralist)
@@ -140,9 +118,9 @@ func (r *Runtime) SessionService() session.Service {
 	return r.sessionService
 }
 
-func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Content) (agentWorkResult, error) {
+func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Content) (swarmies.PlannerResult, error) {
 	if r == nil || r.runner == nil {
-		return agentWorkResult{}, fmt.Errorf("a2a: runtime runner is not configured")
+		return swarmies.PlannerResult{}, fmt.Errorf("a2a: runtime runner is not configured")
 	}
 
 	if contextID == "" {
@@ -152,7 +130,7 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	var final string
 	for event, err := range r.runner.Run(ctx, "dispatcher", contextID, content, agent.RunConfig{}) {
 		if err != nil {
-			return agentWorkResult{}, fmt.Errorf("a2a: run agent: %w", err)
+			return swarmies.PlannerResult{}, fmt.Errorf("a2a: run agent: %w", err)
 		}
 		if event == nil || event.Content == nil {
 			continue
@@ -163,12 +141,12 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	}
 
 	if final == "" {
-		return agentWorkResult{}, fmt.Errorf("a2a: agent returned no final content")
+		return swarmies.PlannerResult{}, fmt.Errorf("a2a: agent returned no final content")
 	}
 
-	var result agentWorkResult
-	if err := json.Unmarshal([]byte(final), &result); err != nil {
-		return agentWorkResult{}, fmt.Errorf("a2a: decode agent result: %w", err)
+	result, ok := swarmies.DecodePlannerResult(final)
+	if !ok {
+		return swarmies.PlannerResult{}, fmt.Errorf("a2a: decode agent result: unknown planner result contract")
 	}
 
 	return result, nil
@@ -191,12 +169,12 @@ func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 					return
 				}
 
-				result := agentWorkResult{
+				result := swarmies.PlannerResult{
 					TaskID:    req.TaskID,
 					ContextID: req.ContextID,
-					State:     stateSucceeded,
+					Outcome:   swarmies.PlannerOutcomeSuccess,
 					Summary:   fmt.Sprintf("Generalist agent claimed %s and produced a structured result", req.TaskID),
-					Artifacts: []runtimeArtifact{
+					Artifacts: []swarmies.ArtifactRef{
 						{
 							ID:          "claim-receipt",
 							Name:        "beads-claim",

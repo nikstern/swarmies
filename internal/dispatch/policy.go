@@ -12,6 +12,15 @@ func NewDefaultResultPolicy() DefaultResultPolicy {
 }
 
 func (DefaultResultPolicy) Decide(_ swarmies.WorkItem, result a2acore.SendMessageResult) swarmies.OutcomeDecision {
+	if structured, ok := PlannerResult(result); ok {
+		switch structured.Outcome {
+		case swarmies.PlannerOutcomeSuccess:
+			return swarmies.OutcomeClose
+		case swarmies.PlannerOutcomeBlocked, swarmies.PlannerOutcomeNeedsInput, swarmies.PlannerOutcomeHandoff:
+			return swarmies.OutcomeKeep
+		}
+	}
+
 	switch typed := result.(type) {
 	case *a2acore.Message:
 		return swarmies.OutcomeClose

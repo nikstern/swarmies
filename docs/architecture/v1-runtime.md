@@ -13,7 +13,9 @@ Two rules shape the design:
 
 v1 should avoid inventing a custom wire protocol between the dispatcher and
 agent. Internal Swarmies types can exist, but they should adapt cleanly to ADK
-and A2A types.
+and A2A types. The main exception is one small structured planner result
+contract for the `generalist` profile so the runtime and dispatcher can
+interpret non-success outcomes consistently.
 
 ## Main Decisions
 
@@ -146,18 +148,6 @@ type DispatchRequest struct {
 	IdempotencyKey string
 }
 
-type DispatchResult struct {
-	TaskID       string
-	ContextID    string
-	State        ExecutionState
-	MessageID    string
-	Summary      string
-	Artifacts    []ArtifactRef
-	ErrorCode    string
-	ErrorMessage string
-	CompletedAt  *time.Time
-}
-
 type AgentSkill struct {
 	ID          string
 	Name        string
@@ -173,16 +163,6 @@ type ArtifactRef struct {
 	Description string
 }
 
-type ExecutionState string
-
-const (
-	StateSubmitted     ExecutionState = "submitted"
-	StateWorking       ExecutionState = "working"
-	StateInputRequired ExecutionState = "input_required"
-	StateSucceeded     ExecutionState = "succeeded"
-	StateFailed        ExecutionState = "failed"
-)
-
 type OutcomeDecision string
 
 const (
@@ -191,6 +171,53 @@ const (
 	OutcomeRetry OutcomeDecision = "retry"
 )
 ```
+
+## Planner Result Contract
+
+The v1 `generalist` profile is a planner and triage agent. It should return one
+shared structured payload regardless of whether the A2A transport surfaces that
+payload in a task message or artifact.
+
+```go
+type PlannerOutcome string
+
+const (
+	PlannerOutcomeSuccess    PlannerOutcome = "success"
+	PlannerOutcomeBlocked    PlannerOutcome = "blocked"
+	PlannerOutcomeNeedsInput PlannerOutcome = "needs_input"
+	PlannerOutcomeHandoff    PlannerOutcome = "handoff"
+)
+
+type PlannerResult struct {
+	TaskID        string
+	ContextID     string
+	Outcome       PlannerOutcome
+	Summary       string
+	Artifacts     []ArtifactRef
+	BlockedReason string
+	InputRequest  *InputRequest
+	Handoff       *HandoffRecommendation
+	ErrorMessage  string
+}
+```
+
+Dispatcher-facing fields:
+
+- `outcome` is the canonical lifecycle signal
+- `task_id` and `context_id` tie the result back to the original dispatch
+- `error_message` is reserved for retry-worthy execution failure detail
+
+Agent-facing and human-facing fields:
+
+- `summary` is the short explanation that should appear in close reasons or
+  inspection comments
+- `blocked_reason`, `input_request`, and `handoff` explain why the planner could
+  not proceed directly
+- `artifacts` preserves any inspectable receipts or references
+
+For v1 the dispatcher should treat `success` as closeable work. `blocked`,
+`needs_input`, and `handoff` are terminal planner outcomes for that execution
+attempt, but they are not successful completion of the Beads task.
 
 ## Mapping To A2A
 

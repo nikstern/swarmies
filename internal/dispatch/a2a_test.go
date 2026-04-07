@@ -54,16 +54,16 @@ func TestSummaryAndErrorMessageUseA2AResults(t *testing.T) {
 			State: a2acore.TaskStateFailed,
 			Message: a2acore.NewMessage(
 				a2acore.MessageRoleAgent,
-				a2acore.TextPart{Text: "dispatch failed"},
+				a2acore.TextPart{Text: `{"task_id":"swarmies-3oq","context_id":"swarmies-3oq","outcome":"blocked","summary":"waiting on credentials","blocked_reason":"missing API key"}`},
 			),
 		},
 	}
 
-	if got := Summary(task); got != "dispatch failed" {
-		t.Fatalf("Summary(task) = %q, want %q", got, "dispatch failed")
+	if got := Summary(task); got != "waiting on credentials" {
+		t.Fatalf("Summary(task) = %q, want %q", got, "waiting on credentials")
 	}
-	if got := ErrorMessage(task); got != "dispatch failed" {
-		t.Fatalf("ErrorMessage(task) = %q, want %q", got, "dispatch failed")
+	if got := ErrorMessage(task); got != "missing API key" {
+		t.Fatalf("ErrorMessage(task) = %q, want %q", got, "missing API key")
 	}
 }
 
@@ -75,7 +75,7 @@ func TestSummaryUsesStructuredArtifactPayload(t *testing.T) {
 		Artifacts: []*a2acore.Artifact{
 			{
 				Parts: []a2acore.Part{
-					a2acore.TextPart{Text: `{"summary":"claimed over live A2A"}`},
+					a2acore.TextPart{Text: `{"task_id":"swarmies-8pk","context_id":"swarmies-8pk","outcome":"success","summary":"claimed over live A2A"}`},
 				},
 			},
 		},
@@ -83,5 +83,25 @@ func TestSummaryUsesStructuredArtifactPayload(t *testing.T) {
 
 	if got := Summary(task); got != "claimed over live A2A" {
 		t.Fatalf("Summary(task) = %q, want %q", got, "claimed over live A2A")
+	}
+}
+
+func TestPlannerResultPrefersStructuredPayload(t *testing.T) {
+	t.Parallel()
+
+	msg := a2acore.NewMessage(
+		a2acore.MessageRoleAgent,
+		a2acore.TextPart{Text: `{"task_id":"swarmies-9ab","context_id":"swarmies-9ab","outcome":"handoff","summary":"needs coding specialist","handoff":{"target_profile":"coding","reason":"requires implementation work"}}`},
+	)
+
+	got, ok := PlannerResult(msg)
+	if !ok {
+		t.Fatal("PlannerResult(message) ok = false, want true")
+	}
+	if got.Outcome != swarmies.PlannerOutcomeHandoff {
+		t.Fatalf("PlannerResult(message).Outcome = %q, want %q", got.Outcome, swarmies.PlannerOutcomeHandoff)
+	}
+	if got.Handoff == nil || got.Handoff.TargetProfile != swarmies.ProfileCoding {
+		t.Fatalf("PlannerResult(message).Handoff = %#v, want coding handoff", got.Handoff)
 	}
 }

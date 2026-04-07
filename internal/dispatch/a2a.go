@@ -17,11 +17,6 @@ type agentWorkRequest struct {
 	WorkItem       swarmies.WorkItem `json:"work_item"`
 }
 
-type agentWorkResult struct {
-	Summary      string `json:"summary"`
-	ErrorMessage string `json:"error_message,omitempty"`
-}
-
 func BuildMessageParams(workItem swarmies.WorkItem, profile swarmies.AgentProfile) (*a2acore.MessageSendParams, error) {
 	blocking := true
 	payload, err := json.Marshal(agentWorkRequest{
@@ -53,36 +48,45 @@ func BuildMessageParams(workItem swarmies.WorkItem, profile swarmies.AgentProfil
 }
 
 func Summary(result a2acore.SendMessageResult) string {
+	if structured, ok := PlannerResult(result); ok {
+		return structured.Summary
+	}
+
 	switch typed := result.(type) {
 	case *a2acore.Task:
-		return firstNonEmpty(
-			decodeSummary(messageText(typed.Status.Message)),
-			decodeSummary(taskArtifactsText(typed)),
-			messageText(typed.Status.Message),
-			taskArtifactsText(typed),
-		)
+		return firstNonEmpty(messageText(typed.Status.Message), taskArtifactsText(typed))
 	case *a2acore.Message:
-		return firstNonEmpty(decodeSummary(messageText(typed)), messageText(typed))
+		return messageText(typed)
 	default:
 		return ""
 	}
 }
 
 func ErrorMessage(result a2acore.SendMessageResult) string {
+	if structured, ok := PlannerResult(result); ok {
+		return firstNonEmpty(structured.ErrorMessage, structured.BlockedReason, structured.Summary)
+	}
+
 	switch typed := result.(type) {
 	case *a2acore.Task:
 		if typed.Status.State == a2acore.TaskStateFailed || typed.Status.State == a2acore.TaskStateCanceled || typed.Status.State == a2acore.TaskStateRejected {
-			return firstNonEmpty(
-				decodeError(messageText(typed.Status.Message)),
-				decodeError(taskArtifactsText(typed)),
-				messageText(typed.Status.Message),
-				taskArtifactsText(typed),
-			)
+			return firstNonEmpty(messageText(typed.Status.Message), taskArtifactsText(typed))
 		}
 	case *a2acore.Message:
-		return firstNonEmpty(decodeError(messageText(typed)), messageText(typed))
+		return messageText(typed)
 	}
 	return ""
+}
+
+func PlannerResult(result a2acore.SendMessageResult) (swarmies.PlannerResult, bool) {
+	switch typed := result.(type) {
+	case *a2acore.Task:
+		return firstPlannerResult(messageText(typed.Status.Message), taskArtifactsText(typed))
+	case *a2acore.Message:
+		return firstPlannerResult(messageText(typed))
+	default:
+		return swarmies.PlannerResult{}, false
+	}
 }
 
 func messageText(msg *a2acore.Message) string {
@@ -133,23 +137,13 @@ func taskArtifactsText(task *a2acore.Task) string {
 	return strings.Join(parts, "\n")
 }
 
-func decodeSummary(text string) string {
-	var result agentWorkResult
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return ""
+func firstPlannerResult(values ...string) (swarmies.PlannerResult, bool) {
+	for _, value := range values {
+		if result, ok := swarmies.DecodePlannerResult(value); ok {
+			return result, true
+		}
 	}
-	return result.Summary
-}
-
-func decodeError(text string) string {
-	var result agentWorkResult
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return ""
-	}
-	if result.ErrorMessage != "" {
-		return result.ErrorMessage
-	}
-	return result.Summary
+	return swarmies.PlannerResult{}, false
 }
 
 func firstNonEmpty(values ...string) string {
