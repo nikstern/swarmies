@@ -21,6 +21,7 @@ type liveBeadsClient struct {
 	closeTaskID string
 	closeReason string
 	comments    []beadsComment
+	notes       []beadsComment
 }
 
 func (f *liveBeadsClient) Ready(context.Context, int) ([]swarmies.BeadsTaskRef, error) {
@@ -44,6 +45,11 @@ func (f *liveBeadsClient) Close(_ context.Context, id string, reason string) err
 
 func (f *liveBeadsClient) Comment(_ context.Context, id string, body string) error {
 	f.comments = append(f.comments, beadsComment{taskID: id, body: body})
+	return nil
+}
+
+func (f *liveBeadsClient) Note(_ context.Context, id string, body string) error {
+	f.notes = append(f.notes, beadsComment{taskID: id, body: body})
 	return nil
 }
 
@@ -104,11 +110,20 @@ func TestDispatcherRunOnceAgainstLiveA2AAgent(t *testing.T) {
 	if len(beadsClient.comments) != 1 {
 		t.Fatalf("comments = %#v, want one planner note", beadsClient.comments)
 	}
+	if len(beadsClient.notes) != 1 {
+		t.Fatalf("notes = %#v, want one execution report", beadsClient.notes)
+	}
 	if beadsClient.comments[0].taskID != "swarmies-8pk" {
 		t.Fatalf("comment task = %q, want %q", beadsClient.comments[0].taskID, "swarmies-8pk")
 	}
 	if beadsClient.comments[0].body == "" {
 		t.Fatal("comment body = empty, want planner note")
+	}
+	if beadsClient.notes[0].taskID != "swarmies-8pk" {
+		t.Fatalf("note task = %q, want %q", beadsClient.notes[0].taskID, "swarmies-8pk")
+	}
+	if beadsClient.notes[0].body == "" {
+		t.Fatal("note body = empty, want execution report")
 	}
 }
 
@@ -166,6 +181,9 @@ func TestDispatcherRunOnceAgainstLiveA2AAgentKeepsHandoffOpen(t *testing.T) {
 	if len(beadsClient.comments) != 2 {
 		t.Fatalf("comments = %#v, want planner note and dispatcher keep-open note", beadsClient.comments)
 	}
+	if len(beadsClient.notes) != 1 {
+		t.Fatalf("notes = %#v, want one execution report", beadsClient.notes)
+	}
 	if beadsClient.comments[0].taskID != "swarmies-2rt" {
 		t.Fatalf("comment[0] task = %q, want %q", beadsClient.comments[0].taskID, "swarmies-2rt")
 	}
@@ -177,6 +195,68 @@ func TestDispatcherRunOnceAgainstLiveA2AAgentKeepsHandoffOpen(t *testing.T) {
 	}
 	if beadsClient.comments[1].body != "Dispatcher kept task open after handoff outcome: route to coding" {
 		t.Fatalf("comment[1] body = %q, want dispatcher keep-open note", beadsClient.comments[1].body)
+	}
+	if beadsClient.notes[0].body == "" {
+		t.Fatal("note body = empty, want execution report")
+	}
+}
+
+func TestDispatcherRunOnceAgainstLiveA2AAgentLeavesRetryCommentForFailure(t *testing.T) {
+	t.Parallel()
+
+	port := freePort(t)
+	baseURL := "http://127.0.0.1:" + strconv.Itoa(port)
+	beadsClient := &liveBeadsClient{
+		readyRefs: []swarmies.BeadsTaskRef{{ID: "swarmies-7fa"}},
+		task: swarmies.BeadsTask{
+			ID:          "swarmies-7fa",
+			Title:       "Repair broken execution flow",
+			Description: "The runtime hit an error and the broken path needs inspection before retry",
+		},
+	}
+
+	runtime, err := swarmiesa2a.NewRuntime("generalist", beadsClient)
+	if err != nil {
+		t.Fatalf("NewRuntime() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go func() {
+		if err := runtime.RunServer(ctx, swarmiesa2a.ServerConfig{Port: port, PublicURL: baseURL}); err != nil {
+			t.Errorf("RunServer() error = %v", err)
+		}
+	}()
+
+	waitForAgentCard(t, ctx, baseURL)
+
+	dispatcher := NewDispatcher(
+		beadsClient,
+		registry.NewStatic(swarmies.AgentProfile{
+			ID:           swarmies.ProfileGeneralist,
+			Name:         "Generalist",
+			AgentCardURL: baseURL + a2asrv.WellKnownAgentCardPath,
+		}),
+		swarmiesa2a.NewGateway(),
+		NewDefaultResultPolicy(),
+	)
+
+	if err := dispatcher.RunOnce(ctx); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+
+	if beadsClient.closeTaskID != "" {
+		t.Fatalf("closeTaskID = %q, want empty for failure", beadsClient.closeTaskID)
+	}
+	if len(beadsClient.notes) != 1 {
+		t.Fatalf("notes = %#v, want one execution report", beadsClient.notes)
+	}
+	if len(beadsClient.comments) != 2 {
+		t.Fatalf("comments = %#v, want planner note and dispatcher retry note", beadsClient.comments)
+	}
+	if beadsClient.comments[1].body != "Dispatcher marked task for retry after failed outcome: Task description indicates an execution failure that should be retried after inspection." {
+		t.Fatalf("comment[1] body = %q, want dispatcher retry note", beadsClient.comments[1].body)
 	}
 }
 

@@ -150,6 +150,26 @@ func TestClientCommentPassesBody(t *testing.T) {
 	}
 }
 
+func TestClientNotePassesBody(t *testing.T) {
+	t.Parallel()
+
+	client := &Client{
+		binary: "bd",
+		run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			wantArgs := []string{"note", "swarmies-cxd", "execution report"}
+			if !reflect.DeepEqual(args, wantArgs) {
+				t.Fatalf("args = %v, want %v", args, wantArgs)
+			}
+
+			return nil, nil
+		},
+	}
+
+	if err := client.Note(context.Background(), "swarmies-cxd", "execution report"); err != nil {
+		t.Fatalf("Note() error = %v", err)
+	}
+}
+
 func TestCommandErrorIncludesContext(t *testing.T) {
 	t.Parallel()
 

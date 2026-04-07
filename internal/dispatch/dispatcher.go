@@ -80,7 +80,10 @@ func (d *Dispatcher) RunOnce(ctx context.Context) error {
 		}
 		return nil
 	case swarmies.OutcomeRetry:
-		return d.beads.Comment(ctx, workItem.TaskID, ErrorMessage(result))
+		if note := RetryMessage(result); note != "" {
+			return d.beads.Comment(ctx, workItem.TaskID, note)
+		}
+		return nil
 	default:
 		return nil
 	}

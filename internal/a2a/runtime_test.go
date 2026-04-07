@@ -11,6 +11,7 @@ import (
 
 type claimRecorder struct {
 	claimed []string
+	reports []string
 	notes   []string
 }
 
@@ -21,6 +22,11 @@ func (c *claimRecorder) Claim(_ context.Context, id string) error {
 
 func (c *claimRecorder) Comment(_ context.Context, _ string, body string) error {
 	c.notes = append(c.notes, body)
+	return nil
+}
+
+func (c *claimRecorder) Note(_ context.Context, _ string, body string) error {
+	c.reports = append(c.reports, body)
 	return nil
 }
 
@@ -129,5 +135,59 @@ func TestTriageWorkLeavesActionablePlanningNote(t *testing.T) {
 	}
 	if !strings.Contains(note, "Next step:") {
 		t.Fatalf("note = %q, want next step", note)
+	}
+}
+
+func TestTriageWorkMarksFailedExecution(t *testing.T) {
+	t.Parallel()
+
+	result, note := triageWork(agentWorkRequest{
+		TaskID:    "swarmies-1xm",
+		ContextID: "swarmies-1xm",
+		Profile:   "generalist",
+		WorkItem: swarmies.WorkItem{
+			Title: "Fix the broken retry path",
+			Body:  "The last execution failed with an error and needs inspection.",
+		},
+	})
+
+	if result.Outcome != swarmies.OutcomeFailed {
+		t.Fatalf("Outcome = %q, want %q", result.Outcome, swarmies.OutcomeFailed)
+	}
+	if result.ErrorMessage == "" {
+		t.Fatal("ErrorMessage = empty")
+	}
+	if !strings.Contains(note, "Failure detail:") {
+		t.Fatalf("note = %q, want failure detail", note)
+	}
+}
+
+func TestExecutionNoteIncludesStructuredFields(t *testing.T) {
+	t.Parallel()
+
+	note := executionNote(swarmies.ExecutionResult{
+		TaskID:    "swarmies-1xm",
+		ContextID: "ctx-1",
+		Outcome:   swarmies.OutcomeNeedsInput,
+		Summary:   "Need product guidance before proceeding",
+		InputRequest: &swarmies.InputRequest{
+			Question: "Which API owns retries?",
+			Details:  "Dispatcher and agent policy both mention retries.",
+		},
+		Details: map[string]any{
+			"triage_outcome":        "needs_input",
+			"recommended_next_step": "Add the missing ownership decision to the bead.",
+		},
+	})
+
+	for _, want := range []string{
+		"[swarmies/execution]",
+		"status: needs_input",
+		"input_question: Which API owns retries?",
+		"recommended_next_step: Add the missing ownership decision to the bead.",
+	} {
+		if !strings.Contains(note, want) {
+			t.Fatalf("executionNote() = %q, want substring %q", note, want)
+		}
 	}
 }

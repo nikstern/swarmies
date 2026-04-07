@@ -68,6 +68,7 @@ type BeadsClient interface {
 	Claim(ctx context.Context, id string) error
 	Close(ctx context.Context, id string, reason string) error
 	Comment(ctx context.Context, id string, body string) error
+	Note(ctx context.Context, id string, body string) error
 }
 
 type Dispatcher interface {
@@ -230,6 +231,11 @@ In Beads terms this means:
 - `failed`: leave the task open and add a retry-oriented inspection comment
 - `blocked`, `needs_input`, `handoff`: leave the task open and add a dispatcher
   lifecycle comment explaining why it remained open
+
+Agents should also append a lightweight execution report to the bead notes
+field so progress and failure details remain inspectable outside free-form
+comments. The notes entry should stay machine-stable enough to support later
+automation, while comments remain the short human-facing lifecycle summary.
 
 ## Mapping To A2A
 

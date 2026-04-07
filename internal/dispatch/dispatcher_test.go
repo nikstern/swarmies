@@ -16,6 +16,7 @@ type fakeBeadsClient struct {
 	closeTaskID string
 	closeReason string
 	comments    []beadsComment
+	notes       []beadsComment
 }
 
 type beadsComment struct {
@@ -43,6 +44,11 @@ func (f *fakeBeadsClient) Close(_ context.Context, id string, reason string) err
 
 func (f *fakeBeadsClient) Comment(_ context.Context, id string, body string) error {
 	f.comments = append(f.comments, beadsComment{taskID: id, body: body})
+	return nil
+}
+
+func (f *fakeBeadsClient) Note(_ context.Context, id string, body string) error {
+	f.notes = append(f.notes, beadsComment{taskID: id, body: body})
 	return nil
 }
 
@@ -230,6 +236,49 @@ func TestDispatcherRunOnceStructuredHandoffLeavesKeepOpenComment(t *testing.T) {
 	wantComments := []beadsComment{{
 		taskID: "swarmies-1xm",
 		body:   "Dispatcher kept task open after handoff outcome: route to coding",
+	}}
+	if !reflect.DeepEqual(beadsClient.comments, wantComments) {
+		t.Fatalf("comments = %#v, want %#v", beadsClient.comments, wantComments)
+	}
+}
+
+func TestDispatcherRunOnceStructuredFailureLeavesRetryComment(t *testing.T) {
+	t.Parallel()
+
+	beadsClient := &fakeBeadsClient{
+		readyRefs: []swarmies.BeadsTaskRef{{ID: "swarmies-1xm"}},
+		task: swarmies.BeadsTask{
+			ID:          "swarmies-1xm",
+			Title:       "Repair failed retry behavior",
+			Description: "The execution failed and needs another attempt after inspection",
+		},
+	}
+	registry := &fakeRegistry{
+		profile: swarmies.AgentProfile{
+			ID:           swarmies.ProfileGeneralist,
+			AgentCardURL: "http://127.0.0.1:8080/.well-known/agent-card.json",
+		},
+	}
+	gateway := &fakeGateway{
+		result: a2acore.NewMessage(
+			a2acore.MessageRoleAgent,
+			a2acore.TextPart{Text: `{"task_id":"swarmies-1xm","context_id":"swarmies-1xm","outcome":"failed","summary":"execution failed during patch apply","error_message":"git apply failed cleanly"}`},
+		),
+	}
+
+	dispatcher := NewDispatcher(beadsClient, registry, gateway, NewDefaultResultPolicy())
+
+	if err := dispatcher.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+
+	if beadsClient.closeTaskID != "" {
+		t.Fatalf("closed task = %q, want none", beadsClient.closeTaskID)
+	}
+
+	wantComments := []beadsComment{{
+		taskID: "swarmies-1xm",
+		body:   "Dispatcher marked task for retry after failed outcome: git apply failed cleanly",
 	}}
 	if !reflect.DeepEqual(beadsClient.comments, wantComments) {
 		t.Fatalf("comments = %#v, want %#v", beadsClient.comments, wantComments)

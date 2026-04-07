@@ -78,6 +78,22 @@ func ErrorMessage(result a2acore.SendMessageResult) string {
 	return ""
 }
 
+func RetryMessage(result a2acore.SendMessageResult) string {
+	if structured, ok := ExecutionResult(result); ok {
+		detail := firstNonEmpty(structured.ErrorMessage, structured.Summary)
+		if detail == "" {
+			return ""
+		}
+		return fmt.Sprintf("Dispatcher marked task for retry after %s outcome: %s", structured.Outcome, detail)
+	}
+
+	if detail := ErrorMessage(result); detail != "" {
+		return detail
+	}
+
+	return ""
+}
+
 func KeepOpenMessage(result a2acore.SendMessageResult) string {
 	if structured, ok := ExecutionResult(result); ok {
 		detail := structuredKeepOpenDetail(structured)

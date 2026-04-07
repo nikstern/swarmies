@@ -28,6 +28,13 @@ type HandoffRecommendation struct {
 	Reason        string    `json:"reason,omitempty"`
 }
 
+type BeadsProgressRecord struct {
+	Phase   string            `json:"phase"`
+	Status  ExecutionOutcome  `json:"status"`
+	Summary string            `json:"summary"`
+	Details map[string]string `json:"details,omitempty"`
+}
+
 // ExecutionResult is the shared v1 result envelope across agent and work types.
 // Dispatcher-facing lifecycle fields stay stable while agents can attach
 // additional typed context in Details without changing dispatcher parsing.

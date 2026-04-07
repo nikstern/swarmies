@@ -67,6 +67,19 @@ func TestSummaryAndErrorMessageUseA2AResults(t *testing.T) {
 	}
 }
 
+func TestRetryMessageUsesStructuredFailureResult(t *testing.T) {
+	t.Parallel()
+
+	msg := a2acore.NewMessage(
+		a2acore.MessageRoleAgent,
+		a2acore.TextPart{Text: `{"task_id":"swarmies-3oq","context_id":"swarmies-3oq","outcome":"failed","summary":"execution failed","error_message":"git apply failed cleanly"}`},
+	)
+
+	if got := RetryMessage(msg); got != "Dispatcher marked task for retry after failed outcome: git apply failed cleanly" {
+		t.Fatalf("RetryMessage(message) = %q, want structured retry note", got)
+	}
+}
+
 func TestSummaryUsesStructuredArtifactPayload(t *testing.T) {
 	t.Parallel()
 

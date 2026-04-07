@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"sort"
 	"strings"
 
 	"google.golang.org/adk/agent"
@@ -21,6 +22,7 @@ import (
 type beadsClaimer interface {
 	Claim(context.Context, string) error
 	Comment(context.Context, string, string) error
+	Note(context.Context, string, string) error
 }
 
 type Runtime struct {
@@ -157,7 +159,7 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 	return agent.New(agent.Config{
 		Name:        name,
-		Description: "Claims one Beads task, performs planner-style triage, and returns a structured execution result",
+		Description: "Claims one Beads task, records Beads execution progress, performs planner-style triage, and returns a structured execution result",
 		Run: func(ctx agent.InvocationContext) iter.Seq2[*session.Event, error] {
 			return func(yield func(*session.Event, error) bool) {
 				req, err := parseAgentWorkRequest(ctx.UserContent())
@@ -172,6 +174,10 @@ func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 				}
 
 				result, note := triageWork(req)
+				if err := beads.Note(ctx, req.TaskID, executionNote(result)); err != nil {
+					yield(nil, fmt.Errorf("append execution note on task %q: %w", req.TaskID, err))
+					return
+				}
 				if err := beads.Comment(ctx, req.TaskID, note); err != nil {
 					yield(nil, fmt.Errorf("comment on task %q: %w", req.TaskID, err))
 					return
@@ -220,6 +226,12 @@ func triageWork(req agentWorkRequest) (swarmies.ExecutionResult, string) {
 	}, "\n"))
 
 	switch {
+	case containsAny(text, "fail", "failure", "error", "broken", "exception"):
+		result.Outcome = swarmies.OutcomeFailed
+		result.Summary = fmt.Sprintf("Generalist planner could not execute %s cleanly", req.TaskID)
+		result.ErrorMessage = "Task description indicates an execution failure that should be retried after inspection."
+		result.Details["triage_outcome"] = "failed"
+		result.Details["recommended_next_step"] = "Inspect the failure details, fix the underlying issue, and redispatch."
 	case containsAny(text, "blocked by", "waiting on", "awaiting", "depends on", "dependency"):
 		result.Outcome = swarmies.OutcomeBlocked
 		result.Summary = fmt.Sprintf("Generalist planner marked %s as blocked", req.TaskID)
@@ -275,6 +287,8 @@ func inspectionNote(result swarmies.ExecutionResult) string {
 	}
 
 	switch result.Outcome {
+	case swarmies.OutcomeFailed:
+		lines = append(lines, fmt.Sprintf("Failure detail: %s", result.ErrorMessage))
 	case swarmies.OutcomeBlocked:
 		lines = append(lines, fmt.Sprintf("Blocked reason: %s", result.BlockedReason))
 	case swarmies.OutcomeNeedsInput:
@@ -298,6 +312,78 @@ func inspectionNote(result swarmies.ExecutionResult) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func executionNote(result swarmies.ExecutionResult) string {
+	record := swarmies.BeadsProgressRecord{
+		Phase:   "agent_execution",
+		Status:  result.Outcome,
+		Summary: result.Summary,
+		Details: executionDetails(result),
+	}
+
+	lines := []string{
+		"[swarmies/execution]",
+		fmt.Sprintf("phase: %s", record.Phase),
+		fmt.Sprintf("status: %s", record.Status),
+		fmt.Sprintf("summary: %s", record.Summary),
+	}
+
+	if len(record.Details) == 0 {
+		return strings.Join(lines, "\n")
+	}
+
+	keys := make([]string, 0, len(record.Details))
+	for key := range record.Details {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		lines = append(lines, fmt.Sprintf("%s: %s", key, record.Details[key]))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func executionDetails(result swarmies.ExecutionResult) map[string]string {
+	details := map[string]string{}
+
+	if result.TaskID != "" {
+		details["task_id"] = result.TaskID
+	}
+	if result.ContextID != "" {
+		details["context_id"] = result.ContextID
+	}
+	if result.BlockedReason != "" {
+		details["blocked_reason"] = result.BlockedReason
+	}
+	if result.ErrorMessage != "" {
+		details["error_message"] = result.ErrorMessage
+	}
+	if result.InputRequest != nil {
+		if result.InputRequest.Question != "" {
+			details["input_question"] = result.InputRequest.Question
+		}
+		if result.InputRequest.Details != "" {
+			details["input_details"] = result.InputRequest.Details
+		}
+	}
+	if result.Handoff != nil {
+		if result.Handoff.TargetProfile != "" {
+			details["handoff_target"] = string(result.Handoff.TargetProfile)
+		}
+		if result.Handoff.Reason != "" {
+			details["handoff_reason"] = result.Handoff.Reason
+		}
+	}
+	if next, _ := result.Details["recommended_next_step"].(string); next != "" {
+		details["recommended_next_step"] = next
+	}
+	if outcome, _ := result.Details["triage_outcome"].(string); outcome != "" {
+		details["triage_outcome"] = outcome
+	}
+
+	return details
 }
 
 func containsAny(text string, needles ...string) bool {

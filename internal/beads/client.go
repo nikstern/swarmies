@@ -88,6 +88,11 @@ func (c *Client) Comment(ctx context.Context, id string, body string) error {
 	return err
 }
 
+func (c *Client) Note(ctx context.Context, id string, body string) error {
+	_, err := c.run(ctx, c.binary, "note", id, body)
+	return err
+}
+
 func (c *Client) readIssues(ctx context.Context, args ...string) ([]issueRecord, error) {
 	output, err := c.run(ctx, c.binary, args...)
 	if err != nil {

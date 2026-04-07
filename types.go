@@ -13,6 +13,7 @@ type BeadsClient interface {
 	Claim(ctx context.Context, id string) error
 	Close(ctx context.Context, id string, reason string) error
 	Comment(ctx context.Context, id string, body string) error
+	Note(ctx context.Context, id string, body string) error
 }
 
 type Dispatcher interface {
