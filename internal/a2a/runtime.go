@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"strings"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/cmd/launcher"
@@ -19,6 +20,7 @@ import (
 
 type beadsClaimer interface {
 	Claim(context.Context, string) error
+	Comment(context.Context, string, string) error
 }
 
 type Runtime struct {
@@ -155,7 +157,7 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 	return agent.New(agent.Config{
 		Name:        name,
-		Description: "Claims one Beads task and returns a structured execution result",
+		Description: "Claims one Beads task, performs planner-style triage, and returns a structured execution result",
 		Run: func(ctx agent.InvocationContext) iter.Seq2[*session.Event, error] {
 			return func(yield func(*session.Event, error) bool) {
 				req, err := parseAgentWorkRequest(ctx.UserContent())
@@ -169,22 +171,10 @@ func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 					return
 				}
 
-				result := swarmies.ExecutionResult{
-					TaskID:    req.TaskID,
-					ContextID: req.ContextID,
-					Outcome:   swarmies.OutcomeSuccess,
-					Summary:   fmt.Sprintf("Generalist agent claimed %s and produced a structured result", req.TaskID),
-					Artifacts: []swarmies.ArtifactRef{
-						{
-							ID:          "claim-receipt",
-							Name:        "beads-claim",
-							Description: fmt.Sprintf("Claimed %s for profile %s", req.TaskID, req.Profile),
-						},
-					},
-					Details: map[string]any{
-						"agent_type": "generalist",
-						"work_type":  "triage",
-					},
+				result, note := triageWork(req)
+				if err := beads.Comment(ctx, req.TaskID, note); err != nil {
+					yield(nil, fmt.Errorf("comment on task %q: %w", req.TaskID, err))
+					return
 				}
 
 				payload, err := json.Marshal(result)
@@ -204,6 +194,119 @@ func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 			}
 		},
 	})
+}
+
+func triageWork(req agentWorkRequest) (swarmies.ExecutionResult, string) {
+	result := swarmies.ExecutionResult{
+		TaskID:    req.TaskID,
+		ContextID: req.ContextID,
+		Artifacts: []swarmies.ArtifactRef{
+			{
+				ID:          "claim-receipt",
+				Name:        "beads-claim",
+				Description: fmt.Sprintf("Claimed %s for profile %s", req.TaskID, req.Profile),
+			},
+		},
+		Details: map[string]any{
+			"agent_type": "generalist",
+			"work_type":  "triage",
+		},
+	}
+
+	text := strings.ToLower(strings.Join([]string{
+		req.WorkItem.Title,
+		req.WorkItem.Body,
+		strings.Join(req.WorkItem.Labels, " "),
+	}, "\n"))
+
+	switch {
+	case containsAny(text, "blocked by", "waiting on", "awaiting", "depends on", "dependency"):
+		result.Outcome = swarmies.OutcomeBlocked
+		result.Summary = fmt.Sprintf("Generalist planner marked %s as blocked", req.TaskID)
+		result.BlockedReason = "Task description indicates an external dependency or waiting condition."
+		result.Details["triage_outcome"] = "blocked"
+		result.Details["recommended_next_step"] = "Resolve the dependency before redispatch."
+	case containsAny(text, "needs input", "need input", "clarify", "clarification", "open question", "decision", "which ", "what "):
+		result.Outcome = swarmies.OutcomeNeedsInput
+		result.Summary = fmt.Sprintf("Generalist planner needs more input before proceeding on %s", req.TaskID)
+		result.InputRequest = &swarmies.InputRequest{
+			Question: "What missing decision or clarification should guide this task?",
+			Details:  "The task description reads as ambiguous or decision-dependent for v1 triage.",
+		}
+		result.Details["triage_outcome"] = "needs_input"
+		result.Details["recommended_next_step"] = "Add the missing product or technical guidance to the bead."
+	case containsAny(text, "research", "investigate", "analyze", "analysis", "evaluate", "compare", "survey"):
+		result.Outcome = swarmies.OutcomeHandoff
+		result.Summary = fmt.Sprintf("Generalist planner recommends handing %s to the research profile", req.TaskID)
+		result.Handoff = &swarmies.HandoffRecommendation{
+			TargetProfile: swarmies.ProfileResearch,
+			Reason:        "The task reads like analysis or information-gathering work.",
+		}
+		result.Details["triage_outcome"] = "handoff"
+		result.Details["recommended_next_step"] = "Route this bead to the research specialist."
+	case containsAny(text, "implement", "implementation", "build", "write code", "refactor", "test", "fix"):
+		result.Outcome = swarmies.OutcomeHandoff
+		result.Summary = fmt.Sprintf("Generalist planner recommends handing %s to the coding profile", req.TaskID)
+		result.Handoff = &swarmies.HandoffRecommendation{
+			TargetProfile: swarmies.ProfileCoding,
+			Reason:        "The task requires implementation-oriented work rather than generalist triage.",
+		}
+		result.Details["triage_outcome"] = "handoff"
+		result.Details["recommended_next_step"] = "Route this bead to the coding specialist."
+	default:
+		result.Outcome = swarmies.OutcomeSuccess
+		result.Summary = fmt.Sprintf("Generalist planner triaged %s as actionable and recorded a plan", req.TaskID)
+		result.Artifacts = append(result.Artifacts, swarmies.ArtifactRef{
+			ID:          "triage-note",
+			Name:        "planner-note",
+			Description: fmt.Sprintf("Planner note recorded for %s", req.TaskID),
+		})
+		result.Details["triage_outcome"] = "actionable"
+		result.Details["recommended_next_step"] = "Proceed with the next bounded planning step."
+	}
+
+	return result, inspectionNote(result)
+}
+
+func inspectionNote(result swarmies.ExecutionResult) string {
+	lines := []string{
+		fmt.Sprintf("Planner triage: %s", result.Outcome),
+		fmt.Sprintf("Summary: %s", result.Summary),
+	}
+
+	switch result.Outcome {
+	case swarmies.OutcomeBlocked:
+		lines = append(lines, fmt.Sprintf("Blocked reason: %s", result.BlockedReason))
+	case swarmies.OutcomeNeedsInput:
+		if result.InputRequest != nil {
+			lines = append(lines, fmt.Sprintf("Input request: %s", result.InputRequest.Question))
+			if result.InputRequest.Details != "" {
+				lines = append(lines, fmt.Sprintf("Details: %s", result.InputRequest.Details))
+			}
+		}
+	case swarmies.OutcomeHandoff:
+		if result.Handoff != nil {
+			lines = append(lines, fmt.Sprintf("Recommended profile: %s", result.Handoff.TargetProfile))
+			if result.Handoff.Reason != "" {
+				lines = append(lines, fmt.Sprintf("Reason: %s", result.Handoff.Reason))
+			}
+		}
+	case swarmies.OutcomeSuccess:
+		if next, _ := result.Details["recommended_next_step"].(string); next != "" {
+			lines = append(lines, fmt.Sprintf("Next step: %s", next))
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func containsAny(text string, needles ...string) bool {
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseAgentWorkRequest(content *genai.Content) (agentWorkRequest, error) {

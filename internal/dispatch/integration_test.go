@@ -56,8 +56,8 @@ func TestDispatcherRunOnceAgainstLiveA2AAgent(t *testing.T) {
 		readyRefs: []swarmies.BeadsTaskRef{{ID: "swarmies-8pk"}},
 		task: swarmies.BeadsTask{
 			ID:          "swarmies-8pk",
-			Title:       "Implement runnable A2A agent server for v1 Phase 3",
-			Description: "Run through a live A2A server and close on success",
+			Title:       "Document runnable A2A planner flow for v1 Phase 3",
+			Description: "Record the planner-oriented runtime contract and close on success",
 		},
 	}
 
@@ -101,8 +101,70 @@ func TestDispatcherRunOnceAgainstLiveA2AAgent(t *testing.T) {
 	if beadsClient.closeReason == "" {
 		t.Fatal("close reason = empty, want structured summary")
 	}
-	if len(beadsClient.comments) != 0 {
-		t.Fatalf("comments = %#v, want none", beadsClient.comments)
+	if len(beadsClient.comments) != 1 {
+		t.Fatalf("comments = %#v, want one planner note", beadsClient.comments)
+	}
+	if beadsClient.comments[0].taskID != "swarmies-8pk" {
+		t.Fatalf("comment task = %q, want %q", beadsClient.comments[0].taskID, "swarmies-8pk")
+	}
+	if beadsClient.comments[0].body == "" {
+		t.Fatal("comment body = empty, want planner note")
+	}
+}
+
+func TestDispatcherRunOnceAgainstLiveA2AAgentKeepsHandoffOpen(t *testing.T) {
+	t.Parallel()
+
+	port := freePort(t)
+	baseURL := "http://127.0.0.1:" + strconv.Itoa(port)
+	beadsClient := &liveBeadsClient{
+		readyRefs: []swarmies.BeadsTaskRef{{ID: "swarmies-2rt"}},
+		task: swarmies.BeadsTask{
+			ID:          "swarmies-2rt",
+			Title:       "Implement dispatcher retry coverage",
+			Description: "Write code to extend the non-success dispatcher behavior",
+		},
+	}
+
+	runtime, err := swarmiesa2a.NewRuntime("generalist", beadsClient)
+	if err != nil {
+		t.Fatalf("NewRuntime() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	go func() {
+		if err := runtime.RunServer(ctx, swarmiesa2a.ServerConfig{Port: port, PublicURL: baseURL}); err != nil {
+			t.Errorf("RunServer() error = %v", err)
+		}
+	}()
+
+	waitForAgentCard(t, ctx, baseURL)
+
+	dispatcher := NewDispatcher(
+		beadsClient,
+		registry.NewStatic(swarmies.AgentProfile{
+			ID:           swarmies.ProfileGeneralist,
+			Name:         "Generalist",
+			AgentCardURL: baseURL + a2asrv.WellKnownAgentCardPath,
+		}),
+		swarmiesa2a.NewGateway(),
+		NewDefaultResultPolicy(),
+	)
+
+	if err := dispatcher.RunOnce(ctx); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+
+	if len(beadsClient.claimed) != 1 || beadsClient.claimed[0] != "swarmies-2rt" {
+		t.Fatalf("claimed = %#v, want [swarmies-2rt]", beadsClient.claimed)
+	}
+	if beadsClient.closeTaskID != "" {
+		t.Fatalf("closeTaskID = %q, want empty for handoff", beadsClient.closeTaskID)
+	}
+	if len(beadsClient.comments) != 1 {
+		t.Fatalf("comments = %#v, want one planner handoff note", beadsClient.comments)
 	}
 }
 
