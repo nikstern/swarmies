@@ -12,12 +12,14 @@ func NewDefaultResultPolicy() DefaultResultPolicy {
 }
 
 func (DefaultResultPolicy) Decide(_ swarmies.WorkItem, result a2acore.SendMessageResult) swarmies.OutcomeDecision {
-	if structured, ok := PlannerResult(result); ok {
+	if structured, ok := ExecutionResult(result); ok {
 		switch structured.Outcome {
-		case swarmies.PlannerOutcomeSuccess:
+		case swarmies.OutcomeSuccess:
 			return swarmies.OutcomeClose
-		case swarmies.PlannerOutcomeBlocked, swarmies.PlannerOutcomeNeedsInput, swarmies.PlannerOutcomeHandoff:
+		case swarmies.OutcomeBlocked, swarmies.OutcomeNeedsInput, swarmies.OutcomeHandoff:
 			return swarmies.OutcomeKeep
+		case swarmies.OutcomeFailed:
+			return swarmies.OutcomeRetry
 		}
 	}
 

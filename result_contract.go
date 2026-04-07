@@ -2,13 +2,14 @@ package swarmies
 
 import "encoding/json"
 
-type PlannerOutcome string
+type ExecutionOutcome string
 
 const (
-	PlannerOutcomeSuccess    PlannerOutcome = "success"
-	PlannerOutcomeBlocked    PlannerOutcome = "blocked"
-	PlannerOutcomeNeedsInput PlannerOutcome = "needs_input"
-	PlannerOutcomeHandoff    PlannerOutcome = "handoff"
+	OutcomeSuccess    ExecutionOutcome = "success"
+	OutcomeBlocked    ExecutionOutcome = "blocked"
+	OutcomeNeedsInput ExecutionOutcome = "needs_input"
+	OutcomeHandoff    ExecutionOutcome = "handoff"
+	OutcomeFailed     ExecutionOutcome = "failed"
 )
 
 type ArtifactRef struct {
@@ -27,41 +28,42 @@ type HandoffRecommendation struct {
 	Reason        string    `json:"reason,omitempty"`
 }
 
-// PlannerResult is the shared v1 contract for planner-style generalist outcomes.
-// Dispatcher-facing fields determine lifecycle behavior; agent-facing fields
-// preserve the human-readable context needed for inspection and follow-up.
-type PlannerResult struct {
+// ExecutionResult is the shared v1 result envelope across agent and work types.
+// Dispatcher-facing lifecycle fields stay stable while agents can attach
+// additional typed context in Details without changing dispatcher parsing.
+type ExecutionResult struct {
 	TaskID        string                 `json:"task_id"`
 	ContextID     string                 `json:"context_id"`
-	Outcome       PlannerOutcome         `json:"outcome"`
+	Outcome       ExecutionOutcome       `json:"outcome"`
 	Summary       string                 `json:"summary"`
 	Artifacts     []ArtifactRef          `json:"artifacts,omitempty"`
 	BlockedReason string                 `json:"blocked_reason,omitempty"`
 	InputRequest  *InputRequest          `json:"input_request,omitempty"`
 	Handoff       *HandoffRecommendation `json:"handoff,omitempty"`
 	ErrorMessage  string                 `json:"error_message,omitempty"`
+	Details       map[string]any         `json:"details,omitempty"`
 }
 
-func (r PlannerResult) IsKnownOutcome() bool {
+func (r ExecutionResult) IsKnownOutcome() bool {
 	switch r.Outcome {
-	case PlannerOutcomeSuccess, PlannerOutcomeBlocked, PlannerOutcomeNeedsInput, PlannerOutcomeHandoff:
+	case OutcomeSuccess, OutcomeBlocked, OutcomeNeedsInput, OutcomeHandoff, OutcomeFailed:
 		return true
 	default:
 		return false
 	}
 }
 
-func DecodePlannerResult(text string) (PlannerResult, bool) {
+func DecodeExecutionResult(text string) (ExecutionResult, bool) {
 	if text == "" {
-		return PlannerResult{}, false
+		return ExecutionResult{}, false
 	}
 
-	var result PlannerResult
+	var result ExecutionResult
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return PlannerResult{}, false
+		return ExecutionResult{}, false
 	}
 	if !result.IsKnownOutcome() {
-		return PlannerResult{}, false
+		return ExecutionResult{}, false
 	}
 
 	return result, true

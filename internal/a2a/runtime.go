@@ -118,9 +118,9 @@ func (r *Runtime) SessionService() session.Service {
 	return r.sessionService
 }
 
-func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Content) (swarmies.PlannerResult, error) {
+func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Content) (swarmies.ExecutionResult, error) {
 	if r == nil || r.runner == nil {
-		return swarmies.PlannerResult{}, fmt.Errorf("a2a: runtime runner is not configured")
+		return swarmies.ExecutionResult{}, fmt.Errorf("a2a: runtime runner is not configured")
 	}
 
 	if contextID == "" {
@@ -130,7 +130,7 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	var final string
 	for event, err := range r.runner.Run(ctx, "dispatcher", contextID, content, agent.RunConfig{}) {
 		if err != nil {
-			return swarmies.PlannerResult{}, fmt.Errorf("a2a: run agent: %w", err)
+			return swarmies.ExecutionResult{}, fmt.Errorf("a2a: run agent: %w", err)
 		}
 		if event == nil || event.Content == nil {
 			continue
@@ -141,12 +141,12 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	}
 
 	if final == "" {
-		return swarmies.PlannerResult{}, fmt.Errorf("a2a: agent returned no final content")
+		return swarmies.ExecutionResult{}, fmt.Errorf("a2a: agent returned no final content")
 	}
 
-	result, ok := swarmies.DecodePlannerResult(final)
+	result, ok := swarmies.DecodeExecutionResult(final)
 	if !ok {
-		return swarmies.PlannerResult{}, fmt.Errorf("a2a: decode agent result: unknown planner result contract")
+		return swarmies.ExecutionResult{}, fmt.Errorf("a2a: decode agent result: unknown execution result contract")
 	}
 
 	return result, nil
@@ -169,10 +169,10 @@ func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 					return
 				}
 
-				result := swarmies.PlannerResult{
+				result := swarmies.ExecutionResult{
 					TaskID:    req.TaskID,
 					ContextID: req.ContextID,
-					Outcome:   swarmies.PlannerOutcomeSuccess,
+					Outcome:   swarmies.OutcomeSuccess,
 					Summary:   fmt.Sprintf("Generalist agent claimed %s and produced a structured result", req.TaskID),
 					Artifacts: []swarmies.ArtifactRef{
 						{
@@ -180,6 +180,10 @@ func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 							Name:        "beads-claim",
 							Description: fmt.Sprintf("Claimed %s for profile %s", req.TaskID, req.Profile),
 						},
+					},
+					Details: map[string]any{
+						"agent_type": "generalist",
+						"work_type":  "triage",
 					},
 				}
 

@@ -48,7 +48,7 @@ func BuildMessageParams(workItem swarmies.WorkItem, profile swarmies.AgentProfil
 }
 
 func Summary(result a2acore.SendMessageResult) string {
-	if structured, ok := PlannerResult(result); ok {
+	if structured, ok := ExecutionResult(result); ok {
 		return structured.Summary
 	}
 
@@ -63,7 +63,7 @@ func Summary(result a2acore.SendMessageResult) string {
 }
 
 func ErrorMessage(result a2acore.SendMessageResult) string {
-	if structured, ok := PlannerResult(result); ok {
+	if structured, ok := ExecutionResult(result); ok {
 		return firstNonEmpty(structured.ErrorMessage, structured.BlockedReason, structured.Summary)
 	}
 
@@ -78,14 +78,14 @@ func ErrorMessage(result a2acore.SendMessageResult) string {
 	return ""
 }
 
-func PlannerResult(result a2acore.SendMessageResult) (swarmies.PlannerResult, bool) {
+func ExecutionResult(result a2acore.SendMessageResult) (swarmies.ExecutionResult, bool) {
 	switch typed := result.(type) {
 	case *a2acore.Task:
-		return firstPlannerResult(messageText(typed.Status.Message), taskArtifactsText(typed))
+		return firstExecutionResult(messageText(typed.Status.Message), taskArtifactsText(typed))
 	case *a2acore.Message:
-		return firstPlannerResult(messageText(typed))
+		return firstExecutionResult(messageText(typed))
 	default:
-		return swarmies.PlannerResult{}, false
+		return swarmies.ExecutionResult{}, false
 	}
 }
 
@@ -137,13 +137,13 @@ func taskArtifactsText(task *a2acore.Task) string {
 	return strings.Join(parts, "\n")
 }
 
-func firstPlannerResult(values ...string) (swarmies.PlannerResult, bool) {
+func firstExecutionResult(values ...string) (swarmies.ExecutionResult, bool) {
 	for _, value := range values {
-		if result, ok := swarmies.DecodePlannerResult(value); ok {
+		if result, ok := swarmies.DecodeExecutionResult(value); ok {
 			return result, true
 		}
 	}
-	return swarmies.PlannerResult{}, false
+	return swarmies.ExecutionResult{}, false
 }
 
 func firstNonEmpty(values ...string) string {

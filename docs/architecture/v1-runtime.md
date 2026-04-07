@@ -13,9 +13,9 @@ Two rules shape the design:
 
 v1 should avoid inventing a custom wire protocol between the dispatcher and
 agent. Internal Swarmies types can exist, but they should adapt cleanly to ADK
-and A2A types. The main exception is one small structured planner result
-contract for the `generalist` profile so the runtime and dispatcher can
-interpret non-success outcomes consistently.
+and A2A types. The main exception is one small structured execution result
+contract so the runtime and dispatcher can interpret outcomes consistently
+across different agent and work types.
 
 ## Main Decisions
 
@@ -172,32 +172,34 @@ const (
 )
 ```
 
-## Planner Result Contract
+## Execution Result Contract
 
-The v1 `generalist` profile is a planner and triage agent. It should return one
-shared structured payload regardless of whether the A2A transport surfaces that
-payload in a task message or artifact.
+v1 agents should return one shared structured payload regardless of whether the
+A2A transport surfaces that payload in a task message or artifact. The
+dispatcher should depend only on the stable lifecycle fields in this contract.
 
 ```go
-type PlannerOutcome string
+type ExecutionOutcome string
 
 const (
-	PlannerOutcomeSuccess    PlannerOutcome = "success"
-	PlannerOutcomeBlocked    PlannerOutcome = "blocked"
-	PlannerOutcomeNeedsInput PlannerOutcome = "needs_input"
-	PlannerOutcomeHandoff    PlannerOutcome = "handoff"
+	OutcomeSuccess    ExecutionOutcome = "success"
+	OutcomeBlocked    ExecutionOutcome = "blocked"
+	OutcomeNeedsInput ExecutionOutcome = "needs_input"
+	OutcomeHandoff    ExecutionOutcome = "handoff"
+	OutcomeFailed     ExecutionOutcome = "failed"
 )
 
-type PlannerResult struct {
+type ExecutionResult struct {
 	TaskID        string
 	ContextID     string
-	Outcome       PlannerOutcome
+	Outcome       ExecutionOutcome
 	Summary       string
 	Artifacts     []ArtifactRef
 	BlockedReason string
 	InputRequest  *InputRequest
 	Handoff       *HandoffRecommendation
 	ErrorMessage  string
+	Details       map[string]any
 }
 ```
 
@@ -214,10 +216,13 @@ Agent-facing and human-facing fields:
 - `blocked_reason`, `input_request`, and `handoff` explain why the planner could
   not proceed directly
 - `artifacts` preserves any inspectable receipts or references
+- `details` is an extension point for agent-specific payloads that the
+  dispatcher can ignore
 
-For v1 the dispatcher should treat `success` as closeable work. `blocked`,
-`needs_input`, and `handoff` are terminal planner outcomes for that execution
-attempt, but they are not successful completion of the Beads task.
+For v1 the dispatcher should treat `success` as closeable work, `failed` as
+retry-worthy execution failure, and `blocked`, `needs_input`, and `handoff` as
+keep-open outcomes. Adding a new work type should not require dispatcher
+changes unless the system introduces a genuinely new lifecycle outcome.
 
 ## Mapping To A2A
 

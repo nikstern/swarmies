@@ -43,6 +43,14 @@ func TestDefaultResultPolicyDecide(t *testing.T) {
 			want: swarmies.OutcomeKeep,
 		},
 		{
+			name: "structured failed task retries even if wrapped in message",
+			result: a2acore.NewMessage(
+				a2acore.MessageRoleAgent,
+				a2acore.TextPart{Text: `{"task_id":"swarmies-1xm","context_id":"swarmies-1xm","outcome":"failed","summary":"tool execution failed","error_message":"git apply failed cleanly"}`},
+			),
+			want: swarmies.OutcomeRetry,
+		},
+		{
 			name: "structured needs-input task stays open",
 			result: a2acore.NewMessage(
 				a2acore.MessageRoleAgent,

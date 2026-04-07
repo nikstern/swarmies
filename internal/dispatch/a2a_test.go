@@ -86,22 +86,25 @@ func TestSummaryUsesStructuredArtifactPayload(t *testing.T) {
 	}
 }
 
-func TestPlannerResultPrefersStructuredPayload(t *testing.T) {
+func TestExecutionResultPrefersStructuredPayload(t *testing.T) {
 	t.Parallel()
 
 	msg := a2acore.NewMessage(
 		a2acore.MessageRoleAgent,
-		a2acore.TextPart{Text: `{"task_id":"swarmies-9ab","context_id":"swarmies-9ab","outcome":"handoff","summary":"needs coding specialist","handoff":{"target_profile":"coding","reason":"requires implementation work"}}`},
+		a2acore.TextPart{Text: `{"task_id":"swarmies-9ab","context_id":"swarmies-9ab","outcome":"handoff","summary":"needs coding specialist","handoff":{"target_profile":"coding","reason":"requires implementation work"},"details":{"work_type":"implementation"}}`},
 	)
 
-	got, ok := PlannerResult(msg)
+	got, ok := ExecutionResult(msg)
 	if !ok {
-		t.Fatal("PlannerResult(message) ok = false, want true")
+		t.Fatal("ExecutionResult(message) ok = false, want true")
 	}
-	if got.Outcome != swarmies.PlannerOutcomeHandoff {
-		t.Fatalf("PlannerResult(message).Outcome = %q, want %q", got.Outcome, swarmies.PlannerOutcomeHandoff)
+	if got.Outcome != swarmies.OutcomeHandoff {
+		t.Fatalf("ExecutionResult(message).Outcome = %q, want %q", got.Outcome, swarmies.OutcomeHandoff)
 	}
 	if got.Handoff == nil || got.Handoff.TargetProfile != swarmies.ProfileCoding {
-		t.Fatalf("PlannerResult(message).Handoff = %#v, want coding handoff", got.Handoff)
+		t.Fatalf("ExecutionResult(message).Handoff = %#v, want coding handoff", got.Handoff)
+	}
+	if got.Details["work_type"] != "implementation" {
+		t.Fatalf("ExecutionResult(message).Details = %#v, want work_type=implementation", got.Details)
 	}
 }
