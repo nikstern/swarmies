@@ -74,6 +74,11 @@ func (d *Dispatcher) RunOnce(ctx context.Context) error {
 	switch d.policy.Decide(workItem, result) {
 	case swarmies.OutcomeClose:
 		return d.beads.Close(ctx, workItem.TaskID, Summary(result))
+	case swarmies.OutcomeKeep:
+		if note := KeepOpenMessage(result); note != "" {
+			return d.beads.Comment(ctx, workItem.TaskID, note)
+		}
+		return nil
 	case swarmies.OutcomeRetry:
 		return d.beads.Comment(ctx, workItem.TaskID, ErrorMessage(result))
 	default:

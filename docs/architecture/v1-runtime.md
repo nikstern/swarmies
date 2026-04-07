@@ -224,6 +224,13 @@ retry-worthy execution failure, and `blocked`, `needs_input`, and `handoff` as
 keep-open outcomes. Adding a new work type should not require dispatcher
 changes unless the system introduces a genuinely new lifecycle outcome.
 
+In Beads terms this means:
+
+- `success`: close the task with the structured `summary`
+- `failed`: leave the task open and add a retry-oriented inspection comment
+- `blocked`, `needs_input`, `handoff`: leave the task open and add a dispatcher
+  lifecycle comment explaining why it remained open
+
 ## Mapping To A2A
 
 Swarmies should model A2A as the external contract:

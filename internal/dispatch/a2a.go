@@ -78,6 +78,18 @@ func ErrorMessage(result a2acore.SendMessageResult) string {
 	return ""
 }
 
+func KeepOpenMessage(result a2acore.SendMessageResult) string {
+	if structured, ok := ExecutionResult(result); ok {
+		detail := structuredKeepOpenDetail(structured)
+		if detail == "" {
+			return ""
+		}
+		return fmt.Sprintf("Dispatcher kept task open after %s outcome: %s", structured.Outcome, detail)
+	}
+
+	return ""
+}
+
 func ExecutionResult(result a2acore.SendMessageResult) (swarmies.ExecutionResult, bool) {
 	switch typed := result.(type) {
 	case *a2acore.Task:
@@ -153,4 +165,27 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func structuredKeepOpenDetail(result swarmies.ExecutionResult) string {
+	switch result.Outcome {
+	case swarmies.OutcomeBlocked:
+		return firstNonEmpty(result.BlockedReason, result.Summary)
+	case swarmies.OutcomeNeedsInput:
+		if result.InputRequest != nil {
+			return firstNonEmpty(result.InputRequest.Question, result.InputRequest.Details, result.Summary)
+		}
+		return result.Summary
+	case swarmies.OutcomeHandoff:
+		if result.Handoff != nil {
+			return firstNonEmpty(
+				fmt.Sprintf("route to %s", result.Handoff.TargetProfile),
+				result.Handoff.Reason,
+				result.Summary,
+			)
+		}
+		return result.Summary
+	default:
+		return ""
+	}
 }

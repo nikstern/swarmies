@@ -163,8 +163,20 @@ func TestDispatcherRunOnceAgainstLiveA2AAgentKeepsHandoffOpen(t *testing.T) {
 	if beadsClient.closeTaskID != "" {
 		t.Fatalf("closeTaskID = %q, want empty for handoff", beadsClient.closeTaskID)
 	}
-	if len(beadsClient.comments) != 1 {
-		t.Fatalf("comments = %#v, want one planner handoff note", beadsClient.comments)
+	if len(beadsClient.comments) != 2 {
+		t.Fatalf("comments = %#v, want planner note and dispatcher keep-open note", beadsClient.comments)
+	}
+	if beadsClient.comments[0].taskID != "swarmies-2rt" {
+		t.Fatalf("comment[0] task = %q, want %q", beadsClient.comments[0].taskID, "swarmies-2rt")
+	}
+	if beadsClient.comments[0].body == "" {
+		t.Fatal("comment[0] body = empty, want planner note")
+	}
+	if beadsClient.comments[1].taskID != "swarmies-2rt" {
+		t.Fatalf("comment[1] task = %q, want %q", beadsClient.comments[1].taskID, "swarmies-2rt")
+	}
+	if beadsClient.comments[1].body != "Dispatcher kept task open after handoff outcome: route to coding" {
+		t.Fatalf("comment[1] body = %q, want dispatcher keep-open note", beadsClient.comments[1].body)
 	}
 }
 

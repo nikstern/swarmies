@@ -192,3 +192,46 @@ func TestDispatcherRunOnceFailedTaskLeavesInspectionComment(t *testing.T) {
 		t.Fatalf("comments = %#v, want %#v", beadsClient.comments, wantComments)
 	}
 }
+
+func TestDispatcherRunOnceStructuredHandoffLeavesKeepOpenComment(t *testing.T) {
+	t.Parallel()
+
+	beadsClient := &fakeBeadsClient{
+		readyRefs: []swarmies.BeadsTaskRef{{ID: "swarmies-1xm"}},
+		task: swarmies.BeadsTask{
+			ID:          "swarmies-1xm",
+			Title:       "Investigate dispatcher outcome behavior",
+			Description: "Analyze whether this task should route elsewhere",
+		},
+	}
+	registry := &fakeRegistry{
+		profile: swarmies.AgentProfile{
+			ID:           swarmies.ProfileGeneralist,
+			AgentCardURL: "http://127.0.0.1:8080/.well-known/agent-card.json",
+		},
+	}
+	gateway := &fakeGateway{
+		result: a2acore.NewMessage(
+			a2acore.MessageRoleAgent,
+			a2acore.TextPart{Text: `{"task_id":"swarmies-1xm","context_id":"swarmies-1xm","outcome":"handoff","summary":"better suited for coding","handoff":{"target_profile":"coding","reason":"requires code changes"}}`},
+		),
+	}
+
+	dispatcher := NewDispatcher(beadsClient, registry, gateway, NewDefaultResultPolicy())
+
+	if err := dispatcher.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+
+	if beadsClient.closeTaskID != "" {
+		t.Fatalf("closed task = %q, want none", beadsClient.closeTaskID)
+	}
+
+	wantComments := []beadsComment{{
+		taskID: "swarmies-1xm",
+		body:   "Dispatcher kept task open after handoff outcome: route to coding",
+	}}
+	if !reflect.DeepEqual(beadsClient.comments, wantComments) {
+		t.Fatalf("comments = %#v, want %#v", beadsClient.comments, wantComments)
+	}
+}
