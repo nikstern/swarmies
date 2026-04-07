@@ -29,6 +29,11 @@ type Runtime struct {
 	sessionService session.Service
 }
 
+type ServerConfig struct {
+	Port      int
+	PublicURL string
+}
+
 type agentWorkRequest struct {
 	TaskID         string            `json:"task_id"`
 	ContextID      string            `json:"context_id"`
@@ -38,13 +43,13 @@ type agentWorkRequest struct {
 }
 
 type agentWorkResult struct {
-	TaskID       string             `json:"task_id"`
-	ContextID    string             `json:"context_id"`
-	State        executionState     `json:"state"`
-	Summary      string             `json:"summary"`
-	Artifacts    []runtimeArtifact  `json:"artifacts,omitempty"`
-	ErrorCode    string             `json:"error_code,omitempty"`
-	ErrorMessage string             `json:"error_message,omitempty"`
+	TaskID       string            `json:"task_id"`
+	ContextID    string            `json:"context_id"`
+	State        executionState    `json:"state"`
+	Summary      string            `json:"summary"`
+	Artifacts    []runtimeArtifact `json:"artifacts,omitempty"`
+	ErrorCode    string            `json:"error_code,omitempty"`
+	ErrorMessage string            `json:"error_message,omitempty"`
 }
 
 type runtimeArtifact struct {
@@ -67,7 +72,7 @@ func NewRuntime(name string, beads beadsClaimer) (*Runtime, error) {
 		return nil, fmt.Errorf("a2a: beads claimer is required")
 	}
 
-	rootAgent, err := newGeneralistAgent(beads)
+	rootAgent, err := newAgent(name, beads)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +96,32 @@ func NewRuntime(name string, beads beadsClaimer) (*Runtime, error) {
 		runner:         run,
 		sessionService: sessionService,
 	}, nil
+}
+
+func (r *Runtime) RunServer(ctx context.Context, cfg ServerConfig) error {
+	if r == nil || r.launcher == nil || r.config == nil {
+		return fmt.Errorf("a2a: runtime launcher is not configured")
+	}
+
+	port := cfg.Port
+	if port <= 0 {
+		port = 8080
+	}
+
+	publicURL := cfg.PublicURL
+	if publicURL == "" {
+		publicURL = fmt.Sprintf("http://127.0.0.1:%d", port)
+	}
+
+	args := []string{
+		"--port", fmt.Sprintf("%d", port),
+		"a2a", "--a2a_agent_url", publicURL,
+	}
+	if _, err := r.launcher.Parse(args); err != nil {
+		return fmt.Errorf("a2a: parse launcher args: %w", err)
+	}
+
+	return r.launcher.Run(ctx, r.config)
 }
 
 func (r *Runtime) Description() string {
@@ -143,9 +174,9 @@ func (r *Runtime) Run(ctx context.Context, contextID string, content *genai.Cont
 	return result, nil
 }
 
-func newGeneralistAgent(beads beadsClaimer) (agent.Agent, error) {
+func newAgent(name string, beads beadsClaimer) (agent.Agent, error) {
 	return agent.New(agent.Config{
-		Name:        string(swarmies.ProfileGeneralist),
+		Name:        name,
 		Description: "Claims one Beads task and returns a structured execution result",
 		Run: func(ctx agent.InvocationContext) iter.Seq2[*session.Event, error] {
 			return func(yield func(*session.Event, error) bool) {

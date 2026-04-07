@@ -24,19 +24,19 @@ func DefaultProfiles() []swarmies.AgentProfile {
 			ID:           swarmies.ProfileGeneralist,
 			Name:         "Generalist",
 			Description:  "Default profile for uncategorized work",
-			AgentCardURL: "http://127.0.0.1:8080",
+			AgentCardURL: "http://127.0.0.1:8080/.well-known/agent-card.json",
 		},
 		{
 			ID:           swarmies.ProfileResearch,
 			Name:         "Research",
 			Description:  "Profile for analysis and information gathering",
-			AgentCardURL: "http://127.0.0.1:8081",
+			AgentCardURL: "http://127.0.0.1:8081/.well-known/agent-card.json",
 		},
 		{
 			ID:           swarmies.ProfileCoding,
 			Name:         "Coding",
 			Description:  "Profile for implementation-oriented work",
-			AgentCardURL: "http://127.0.0.1:8082",
+			AgentCardURL: "http://127.0.0.1:8082/.well-known/agent-card.json",
 		},
 	}
 }

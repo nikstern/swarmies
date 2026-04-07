@@ -17,6 +17,11 @@ type agentWorkRequest struct {
 	WorkItem       swarmies.WorkItem `json:"work_item"`
 }
 
+type agentWorkResult struct {
+	Summary      string `json:"summary"`
+	ErrorMessage string `json:"error_message,omitempty"`
+}
+
 func BuildMessageParams(workItem swarmies.WorkItem, profile swarmies.AgentProfile) (*a2acore.MessageSendParams, error) {
 	blocking := true
 	payload, err := json.Marshal(agentWorkRequest{
@@ -32,7 +37,6 @@ func BuildMessageParams(workItem swarmies.WorkItem, profile swarmies.AgentProfil
 
 	msg := a2acore.NewMessage(a2acore.MessageRoleUser, a2acore.TextPart{Text: string(payload)})
 	msg.ContextID = workItem.TaskID
-	msg.TaskID = a2acore.TaskID(workItem.TaskID)
 
 	return &a2acore.MessageSendParams{
 		Config: &a2acore.MessageSendConfig{
@@ -51,9 +55,14 @@ func BuildMessageParams(workItem swarmies.WorkItem, profile swarmies.AgentProfil
 func Summary(result a2acore.SendMessageResult) string {
 	switch typed := result.(type) {
 	case *a2acore.Task:
-		return messageText(typed.Status.Message)
+		return firstNonEmpty(
+			decodeSummary(messageText(typed.Status.Message)),
+			decodeSummary(taskArtifactsText(typed)),
+			messageText(typed.Status.Message),
+			taskArtifactsText(typed),
+		)
 	case *a2acore.Message:
-		return messageText(typed)
+		return firstNonEmpty(decodeSummary(messageText(typed)), messageText(typed))
 	default:
 		return ""
 	}
@@ -63,10 +72,15 @@ func ErrorMessage(result a2acore.SendMessageResult) string {
 	switch typed := result.(type) {
 	case *a2acore.Task:
 		if typed.Status.State == a2acore.TaskStateFailed || typed.Status.State == a2acore.TaskStateCanceled || typed.Status.State == a2acore.TaskStateRejected {
-			return messageText(typed.Status.Message)
+			return firstNonEmpty(
+				decodeError(messageText(typed.Status.Message)),
+				decodeError(taskArtifactsText(typed)),
+				messageText(typed.Status.Message),
+				taskArtifactsText(typed),
+			)
 		}
 	case *a2acore.Message:
-		return messageText(typed)
+		return firstNonEmpty(decodeError(messageText(typed)), messageText(typed))
 	}
 	return ""
 }
@@ -92,4 +106,57 @@ func messageText(msg *a2acore.Message) string {
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+func taskArtifactsText(task *a2acore.Task) string {
+	if task == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, len(task.Artifacts))
+	for _, artifact := range task.Artifacts {
+		for _, part := range artifact.Parts {
+			switch typed := part.(type) {
+			case a2acore.TextPart:
+				if typed.Text != "" {
+					parts = append(parts, typed.Text)
+				}
+			case a2acore.DataPart:
+				raw, err := json.Marshal(typed.Data)
+				if err == nil && len(raw) > 0 {
+					parts = append(parts, string(raw))
+				}
+			}
+		}
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+func decodeSummary(text string) string {
+	var result agentWorkResult
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return ""
+	}
+	return result.Summary
+}
+
+func decodeError(text string) string {
+	var result agentWorkResult
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return ""
+	}
+	if result.ErrorMessage != "" {
+		return result.ErrorMessage
+	}
+	return result.Summary
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

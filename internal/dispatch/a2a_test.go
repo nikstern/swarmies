@@ -25,8 +25,8 @@ func TestBuildMessageParamsEncodesWorkItem(t *testing.T) {
 	if got := params.Message.ContextID; got != "swarmies-3oq" {
 		t.Fatalf("message.ContextID = %q, want %q", got, "swarmies-3oq")
 	}
-	if got := string(params.Message.TaskID); got != "swarmies-3oq" {
-		t.Fatalf("message.TaskID = %q, want %q", got, "swarmies-3oq")
+	if got := string(params.Message.TaskID); got != "" {
+		t.Fatalf("message.TaskID = %q, want empty for new message/send task", got)
 	}
 	if params.Config == nil || params.Config.Blocking == nil || !*params.Config.Blocking {
 		t.Fatal("params.Config.Blocking = nil/false, want true")
@@ -64,5 +64,24 @@ func TestSummaryAndErrorMessageUseA2AResults(t *testing.T) {
 	}
 	if got := ErrorMessage(task); got != "dispatch failed" {
 		t.Fatalf("ErrorMessage(task) = %q, want %q", got, "dispatch failed")
+	}
+}
+
+func TestSummaryUsesStructuredArtifactPayload(t *testing.T) {
+	t.Parallel()
+
+	task := &a2acore.Task{
+		Status: a2acore.TaskStatus{State: a2acore.TaskStateCompleted},
+		Artifacts: []*a2acore.Artifact{
+			{
+				Parts: []a2acore.Part{
+					a2acore.TextPart{Text: `{"summary":"claimed over live A2A"}`},
+				},
+			},
+		},
+	}
+
+	if got := Summary(task); got != "claimed over live A2A" {
+		t.Fatalf("Summary(task) = %q, want %q", got, "claimed over live A2A")
 	}
 }
